@@ -28,5 +28,5 @@ dist-ssr
 *.sw?
 
 # Локальные данные: БД, загрузки, музыка
-data/
+/data/
 .music-build/
