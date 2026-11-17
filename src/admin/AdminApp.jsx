@@ -24,6 +24,7 @@ export default function AdminApp() {
   const [error, setError] = useState('')
   const [setupToken, setSetupToken] = useState('')
   const [keyName, setKeyName] = useState('')
+  const [inviteToken, setInviteToken] = useState(() => new URLSearchParams(window.location.search).get('invite') || '')
   const [tab, setTab] = useState('messages')
   const [unread, setUnread] = useState(0)
 
@@ -41,6 +42,7 @@ export default function AdminApp() {
   function fail(err) {
     const map = {
       bad_setup_token: 'Неверный токен настройки',
+      bad_invite: 'Ссылка-приглашение недействительна или истекла — создайте новую',
       unauthorized: 'Сессия истекла — войдите снова',
       verification_failed: 'Passkey не принят, попробуйте ещё раз',
       state_changed: 'Состояние изменилось, обновите страницу',
@@ -54,14 +56,24 @@ export default function AdminApp() {
     setError('')
     setBusy('register')
     try {
-      const body = session.registered ? {} : { setupToken: setupToken.trim() }
+      const body = session.registered ? { inviteToken: inviteToken.trim() } : { setupToken: setupToken.trim() }
       const { challengeId, options } = await api.post('/api/auth/register/options', body)
       const response = await startRegistration({ optionsJSON: options })
       await api.post('/api/auth/register/verify', { challengeId, response, name: keyName.trim() })
       setSetupToken('')
       setKeyName('')
+      if (session.registered) {
+        // Ключ по приглашению создан — чистим URL и предлагаем войти.
+        setInviteToken('')
+        window.history.replaceState(null, '', '/admin')
+        setError('')
+        setBusy('')
+        window.alert('Passkey добавлен! Теперь войдите с ним.')
+        refresh()
+        return
+      }
       refresh()
-      if (!session.registered) setSession({ registered: true, authenticated: true })
+      setSession({ registered: true, authenticated: true })
     } catch (err) {
       if (err.name !== 'NotAllowedError') fail(err)
     } finally {
@@ -108,13 +120,37 @@ export default function AdminApp() {
           {!supported && <p className="adm-error">Этот браузер не поддерживает passkey (WebAuthn).</p>}
           {error && <p className="adm-error">{error}</p>}
           {session.registered ? (
-            <>
-              <p className="adm-hint">Вход только по passkey. Никаких паролей.</p>
-              <button type="button" className="adm-primary" onClick={login} disabled={!supported || busy === 'login'}>
-                {busy === 'login' ? <LoaderCircle size={15} className="spin" /> : <KeyRound size={15} />}
-                Войти с passkey
-              </button>
-            </>
+            inviteToken ? (
+              <form onSubmit={registerPasskey}>
+                <p className="adm-hint">Регистрация нового passkey на этом устройстве по одноразовой ссылке.</p>
+                <label className="adm-field">
+                  <span>Название ключа (например, «Айфон»)</span>
+                  <input type="text" value={keyName} onChange={(e) => setKeyName(e.target.value)} autoComplete="off" />
+                </label>
+                <button type="submit" className="adm-primary" disabled={!supported || busy === 'register'}>
+                  {busy === 'register' ? <LoaderCircle size={15} className="spin" /> : <ShieldCheck size={15} />}
+                  Зарегистрировать passkey
+                </button>
+                <button
+                  type="button"
+                  className="adm-link-btn"
+                  onClick={() => {
+                    setInviteToken('')
+                    window.history.replaceState(null, '', '/admin')
+                  }}
+                >
+                  отмена — у меня уже есть ключ
+                </button>
+              </form>
+            ) : (
+              <>
+                <p className="adm-hint">Вход только по passkey. Никаких паролей.</p>
+                <button type="button" className="adm-primary" onClick={login} disabled={!supported || busy === 'login'}>
+                  {busy === 'login' ? <LoaderCircle size={15} className="spin" /> : <KeyRound size={15} />}
+                  Войти с passkey
+                </button>
+              </>
+            )
           ) : (
             <form onSubmit={registerPasskey}>
               <p className="adm-hint">

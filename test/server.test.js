@@ -199,6 +199,65 @@ test('админка без сессии закрыта', async () => {
   assert.equal(res.statusCode, 401)
 })
 
+test('passkey-приглашения: создание и одноразовость', async () => {
+  // Имитируем уже зарегистрированный ключ, иначе действует setup-режим.
+  db.prepare(
+    "INSERT INTO credentials (id, public_key, counter, transports, device_type, backed_up, name, created_at) VALUES ('test-cred', X'0102', 0, '[]', 'singleDevice', 0, 'Тест', 1)",
+  ).run()
+
+  const noAuth = await app.inject({
+    method: 'POST',
+    url: '/api/auth/register/options',
+    headers: { origin: ORIGIN, 'content-type': 'application/json' },
+    payload: '{}',
+  })
+  assert.equal(noAuth.statusCode, 401)
+
+  const badInvite = await app.inject({
+    method: 'POST',
+    url: '/api/auth/register/options',
+    headers: { origin: ORIGIN, 'content-type': 'application/json' },
+    payload: JSON.stringify({ inviteToken: 'wrong' }),
+  })
+  assert.equal(badInvite.statusCode, 403)
+  assert.equal(badInvite.json().error, 'bad_invite')
+
+  const cookie = adminCookie()
+  const invite = await app.inject({ method: 'POST', url: '/api/auth/passkey-invites', headers: { cookie, origin: ORIGIN } })
+  assert.equal(invite.statusCode, 200)
+  const { token } = invite.json()
+  assert.ok(token.length > 20)
+
+  const options = await app.inject({
+    method: 'POST',
+    url: '/api/auth/register/options',
+    headers: { origin: ORIGIN, 'content-type': 'application/json' },
+    payload: JSON.stringify({ inviteToken: token }),
+  })
+  assert.equal(options.statusCode, 200)
+  assert.ok(options.json().challengeId)
+  assert.equal(options.json().options.excludeCredentials.length, 1)
+
+  // Просроченное приглашение не принимается.
+  db.prepare('UPDATE key_invites SET expires_at = ?').run(Date.now() - 1)
+  const expired = await app.inject({
+    method: 'POST',
+    url: '/api/auth/register/options',
+    headers: { origin: ORIGIN, 'content-type': 'application/json' },
+    payload: JSON.stringify({ inviteToken: token }),
+  })
+  assert.equal(expired.statusCode, 403)
+
+  // Сессия по-прежнему работает без приглашения.
+  const withSession = await app.inject({
+    method: 'POST',
+    url: '/api/auth/register/options',
+    headers: { cookie, origin: ORIGIN, 'content-type': 'application/json' },
+    payload: '{}',
+  })
+  assert.equal(withSession.statusCode, 200)
+})
+
 test('короткие ссылки: создание, редирект, счётчик, резерв', async () => {
   const cookie = adminCookie()
   const created = await app.inject({

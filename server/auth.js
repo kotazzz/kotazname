@@ -136,7 +136,13 @@ export async function authRoutes(app, ctx) {
       }
       mode = 'setup'
     } else if (!auth.currentSession(req)) {
-      return reply.code(401).send({ error: 'unauthorized' })
+      // Без сессии добавить ключ можно по одноразовому приглашению (для второго устройства).
+      const given = typeof req.body?.inviteToken === 'string' ? req.body.inviteToken.trim() : ''
+      const invite = given && db.prepare('SELECT expires_at FROM key_invites WHERE token_hash = ?').get(tokenHash(given))
+      if (!invite || invite.expires_at < Date.now()) {
+        return reply.code(given ? 403 : 401).send({ error: given ? 'bad_invite' : 'unauthorized' })
+      }
+      mode = 'invite'
     }
 
     const existing = db.prepare('SELECT id, transports FROM credentials').all()
@@ -151,7 +157,11 @@ export async function authRoutes(app, ctx) {
       excludeCredentials: existing.map((row) => ({ id: row.id, transports: JSON.parse(row.transports) })),
       authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
     })
-    const challengeId = auth.putChallenge('register', { challenge: options.challenge, mode })
+    const challengeId = auth.putChallenge('register', {
+      challenge: options.challenge,
+      mode,
+      inviteHash: mode === 'invite' ? tokenHash(req.body.inviteToken.trim()) : null,
+    })
     return { challengeId, options }
   })
 
@@ -161,8 +171,13 @@ export async function authRoutes(app, ctx) {
     if (!entry || typeof response !== 'object' || response === null) return reply.code(400).send({ error: 'bad_challenge' })
 
     // Условия проверяем заново: между options и verify могло что-то измениться.
-    if (entry.mode === 'setup' ? auth.isRegistered() : !auth.currentSession(req)) {
+    if (entry.mode === 'setup' ? auth.isRegistered() : entry.mode === 'invite' ? false : !auth.currentSession(req)) {
       return reply.code(409).send({ error: 'state_changed' })
+    }
+    if (entry.mode === 'invite') {
+      // Приглашение одноразовое: забираем его сразу, повторно использовать нельзя.
+      const gone = db.prepare('DELETE FROM key_invites WHERE token_hash = ? AND expires_at >= ?').run(entry.inviteHash, Date.now())
+      if (!gone.changes) return reply.code(403).send({ error: 'bad_invite' })
     }
 
     let verification
@@ -266,6 +281,19 @@ export async function authRoutes(app, ctx) {
   // --- Управление passkey ----------------------------------------------------------------
   app.register(async (secured) => {
     secured.addHook('preHandler', auth.requireAdmin)
+
+    // Одноразовое приглашение для регистрации passkey на другом устройстве (TTL 30 минут).
+    secured.post('/passkey-invites', async () => {
+      const now = Date.now()
+      db.prepare('DELETE FROM key_invites WHERE expires_at < ?').run(now)
+      const token = randomToken(24)
+      db.prepare('INSERT INTO key_invites (token_hash, created_at, expires_at) VALUES (?, ?, ?)').run(
+        tokenHash(token),
+        now,
+        now + 30 * 60 * 1000,
+      )
+      return { token, expiresAt: now + 30 * 60 * 1000 }
+    })
 
     secured.get('/passkeys', async () => ({
       items: db

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { startRegistration } from '@simplewebauthn/browser'
-import { Check, Fingerprint, LoaderCircle, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import { Check, Copy, Fingerprint, Link2, LoaderCircle, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import { api } from '@/lib/api'
 
 const fmtDate = (ms) =>
@@ -16,6 +16,32 @@ export default function Passkeys() {
   const [renameId, setRenameId] = useState(null)
   const [renameValue, setRenameValue] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [invite, setInvite] = useState('')
+  const [inviteBusy, setInviteBusy] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  async function makeInvite() {
+    setInviteBusy(true)
+    setError('')
+    try {
+      const data = await api.post('/api/auth/passkey-invites')
+      setInvite(`${window.location.origin}/admin?invite=${encodeURIComponent(data.token)}`)
+    } catch (err) {
+      setError(err.code)
+    } finally {
+      setInviteBusy(false)
+    }
+  }
+
+  async function copyInvite() {
+    try {
+      await navigator.clipboard.writeText(invite)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // буфер недоступен — поле и так выделяется по фокусу
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -154,6 +180,25 @@ export default function Passkeys() {
           добавить passkey
         </button>
       </form>
+      <div className="key-invite">
+        <h3>Ключ на другом устройстве</h3>
+        <p className="adm-dim">
+          Создайте одноразовую ссылку (живёт 30 минут), откройте её на другом устройстве и зарегистрируйте ключ там.
+        </p>
+        {invite ? (
+          <div className="key-invite-link">
+            <input readOnly value={invite} onFocus={(e) => e.target.select()} />
+            <button type="button" className="adm-btn" onClick={copyInvite} title="Скопировать">
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+            </button>
+          </div>
+        ) : (
+          <button type="button" className="adm-btn" onClick={makeInvite} disabled={inviteBusy}>
+            {inviteBusy ? <LoaderCircle size={13} className="spin" /> : <Link2 size={13} />}
+            создать ссылку-приглашение
+          </button>
+        )}
+      </div>
     </section>
   )
 }

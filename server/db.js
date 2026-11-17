@@ -83,6 +83,13 @@ const MIGRATIONS = [
     updated_at INTEGER NOT NULL
   ) STRICT;
   `,
+  `
+  CREATE TABLE key_invites (
+    token_hash TEXT PRIMARY KEY,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  ) STRICT;
+  `,
 ]
 
 export function openDb(file) {

@@ -611,6 +611,53 @@
   gap: 8px;
 }
 
+.key-invite {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.key-invite h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ice);
+}
+
+.key-invite .adm-btn {
+  margin-top: 8px;
+}
+
+.key-invite-link {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.key-invite-link input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(6, 18, 31, 0.6);
+  color: var(--ice);
+  font: inherit;
+  font-size: 12px;
+}
+
+.adm-link-btn {
+  display: block;
+  margin: 10px auto 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* Проекты */
 
 .proj-list {
