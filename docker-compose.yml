@@ -1,0 +1,15 @@
+services:
+  kotazname:
+    build: .
+    image: kotazname:local
+    container_name: kotazname
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    networks:
+      - web
+
+networks:
+  web:
+    external: true

@@ -26,3 +26,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Локальные данные: БД, загрузки, музыка
+data/
+.music-build/

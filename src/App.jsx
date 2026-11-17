@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react'
+import { MessageCircleHeart, QrCode } from 'lucide-react'
 import Dither from '@/components/Dither'
+import About from '@/components/About'
+import SteamStatus from '@/components/SteamStatus'
+import GithubGraph from '@/components/GithubGraph'
+import Projects from '@/components/Projects'
+import Player from '@/components/Player'
+import MessageModal from '@/components/MessageModal'
+import QrOverlay from '@/components/QrOverlay'
+import Footer from '@/components/Footer'
 import avatar from './assets/avatar.jpg'
 import { BrandIcon } from './icons'
+import { SOCIALS } from './data/socials'
 import './App.css'
 
 const STORAGE_KEY = 'kotaz-lang'
@@ -14,6 +24,8 @@ const TEXT = {
     copied: 'Скопировано',
     copy: 'Скопировать имя Discord',
     open: 'Открыть',
+    write: 'Отправить сообщение',
+    qrTitle: 'QR-код на kotaz.name',
   },
   en: {
     line: 'This is where you can find me.',
@@ -21,31 +33,10 @@ const TEXT = {
     copied: 'Copied',
     copy: 'Copy Discord username',
     open: 'Open',
+    write: 'Send a message',
+    qrTitle: 'QR code to kotaz.name',
   },
 }
-
-const SOCIALS = [
-  { id: 'telegram', name: 'Telegram', handle: 'kot_az', href: 'https://t.me/kot_az' },
-  { id: 'vk', name: 'VK', handle: 'kotazz', href: 'https://vk.ru/kotazz' },
-  { id: 'tiktok', name: 'TikTok', handle: 'kot_az', href: 'https://www.tiktok.com/@kot_az' },
-  { id: 'discord', name: 'Discord', handle: 'kot_az', copy: true },
-  { id: 'x', name: 'X', handle: 'ko_tazzz', href: 'https://x.com/ko_tazzz' },
-  { id: 'bluesky', name: 'Bluesky', handle: 'kotaz', href: 'https://bsky.app/profile/kotaz.bsky.social' },
-  { id: 'reddit', name: 'Reddit', handle: 'kota_z', href: 'https://www.reddit.com/user/kota_z' },
-  {
-    id: 'steam',
-    name: 'Steam',
-    handle: '76561198968143951',
-    href: 'https://steamcommunity.com/profiles/76561198968143951',
-  },
-  { id: 'twitch', name: 'Twitch', handle: 'semkotaz', href: 'https://www.twitch.tv/semkotaz' },
-  {
-    id: 'youtube',
-    name: 'YouTube',
-    handle: 'UCRpFfxYb-KeO0n8GZC9VztQ',
-    href: 'https://www.youtube.com/channel/UCRpFfxYb-KeO0n8GZC9VztQ',
-  },
-]
 
 function readLang() {
   try {
@@ -96,6 +87,8 @@ function SocialBody({ id, name, handle, live }) {
 function App() {
   const [lang, setLang] = useState(readLang)
   const [copied, setCopied] = useState(false)
+  const [msgOpen, setMsgOpen] = useState(false)
+  const [qrOpen, setQrOpen] = useState(false)
   const text = TEXT[lang]
 
   useEffect(() => {
@@ -139,7 +132,7 @@ function App() {
           palette={PALETTE}
           scale={1.75}
           contrast={0.75}
-          brightness={-0.12}
+          brightness={-0.2}
           mouseStrength={0}
           trail={0.55}
           enableMouseInteraction
@@ -157,6 +150,9 @@ function App() {
       </div>
       <div className="page">
         <header className="top">
+          <button type="button" className="qr-btn" onClick={() => setQrOpen(true)} aria-label={text.qrTitle} title={text.qrTitle}>
+            <QrCode size={17} />
+          </button>
           <div className="lang" role="group" aria-label={text.lang}>
             <button type="button" aria-pressed={lang === 'ru'} onClick={() => chooseLang('ru')}>
               RU
@@ -167,50 +163,65 @@ function App() {
             </button>
           </div>
         </header>
-        <main className="card">
-          <img className="avatar rise" src={avatar} alt="" width="72" height="72" />
-          <div className="identity rise">
-            <h1 className="name" translate="no" aria-label="kot_az">
-              kot<span className="us">_</span>az
-            </h1>
-            <p className="line">{text.line}</p>
-          </div>
-          <ul className="socials">
-            {SOCIALS.map((item, index) => {
-              const shown = item.copy && copied ? text.copied : item.handle
-              const delay = `${0.2 + index * 0.04}s`
-              if (item.copy) {
+        <main className="column">
+          <section className="card" aria-label="kot_az">
+            <img className="avatar rise" src={avatar} alt="" width="72" height="72" />
+            <div className="identity rise">
+              <h1 className="name" translate="no" aria-label="kot_az">
+                kot<span className="us">_</span>az
+              </h1>
+              <p className="line">{text.line}</p>
+            </div>
+            <ul className="socials">
+              {SOCIALS.map((item, index) => {
+                const shown = item.copy && copied ? text.copied : item.handle
+                const delay = `${0.1 + index * 0.03}s`
+                const brand = item.brand || item.id
+                if (item.copy) {
+                  return (
+                    <li key={item.id} className="rise" style={{ animationDelay: delay }}>
+                      <button
+                        type="button"
+                        className={copied ? 'social-link is-copied' : 'social-link'}
+                        onClick={onCopyDiscord}
+                        aria-label={`${text.copy}: ${item.handle}`}
+                      >
+                        <SocialBody id={brand} name={item.name} handle={shown} live />
+                      </button>
+                    </li>
+                  )
+                }
                 return (
                   <li key={item.id} className="rise" style={{ animationDelay: delay }}>
-                    <button
-                      type="button"
-                      className={copied ? 'social-link is-copied' : 'social-link'}
-                      onClick={onCopyDiscord}
-                      aria-label={`${text.copy}: ${item.handle}`}
+                    <a
+                      className="social-link"
+                      href={item.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`${text.open} ${item.name}, ${item.handle}`}
+                      title={item.handle}
                     >
-                      <SocialBody id={item.id} name={item.name} handle={shown} live />
-                    </button>
+                      <SocialBody id={brand} name={item.name} handle={shown} />
+                    </a>
                   </li>
                 )
-              }
-              return (
-                <li key={item.id} className="rise" style={{ animationDelay: delay }}>
-                  <a
-                    className="social-link"
-                    href={item.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={`${text.open} ${item.name}, ${item.handle}`}
-                    title={item.handle}
-                  >
-                    <SocialBody id={item.id} name={item.name} handle={shown} />
-                  </a>
-                </li>
-              )
-            })}
-          </ul>
+              })}
+            </ul>
+            <button type="button" className="write-btn rise" style={{ animationDelay: '0.55s' }} onClick={() => setMsgOpen(true)}>
+              <MessageCircleHeart size={16} aria-hidden="true" />
+              {text.write}
+            </button>
+            <SteamStatus lang={lang} />
+          </section>
+          <About lang={lang} />
+          <GithubGraph lang={lang} />
+          <Projects lang={lang} />
+          <Footer lang={lang} />
         </main>
       </div>
+      <Player lang={lang} />
+      {msgOpen && <MessageModal lang={lang} onClose={() => setMsgOpen(false)} />}
+      {qrOpen && <QrOverlay onClose={() => setQrOpen(false)} />}
     </>
   )
 }

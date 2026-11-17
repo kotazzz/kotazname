@@ -8,6 +8,9 @@ export default defineConfig({
   server: {
     // На этой машине [::1] не принимает соединения, поэтому localhost в браузере не открывается.
     host: '127.0.0.1',
+    proxy: {
+      '/api': 'http://127.0.0.1:8787',
+    },
   },
   resolve: {
     alias: {
