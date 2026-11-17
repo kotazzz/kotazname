@@ -1,5 +1,3 @@
-const MS_YEAR = 365.2425 * 24 * 60 * 60 * 1000
-
 /** Полных лет с даты рождения (YYYY-MM-DD) на сейчас. */
 export function ageNumber(birthdate, now = new Date()) {
   const [y, m, d] = String(birthdate).split('-').map(Number)

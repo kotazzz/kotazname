@@ -8,6 +8,12 @@ const AdminApp = lazy(() => import('./admin/AdminApp.jsx'))
 
 const path = window.location.pathname.replace(/\/+$/, '') || '/'
 
+// Passkey привязан к RP ID kotaz.name — админка живёт только на основном домене.
+const adminHosts = new Set(['kotaz.name', 'localhost', '127.0.0.1'])
+if (path === '/admin' && !adminHosts.has(window.location.hostname) && window.location.hostname !== '') {
+  window.location.replace(`https://kotaz.name/admin${window.location.search}`)
+}
+
 let page
 if (path === '/admin') {
   page = (
